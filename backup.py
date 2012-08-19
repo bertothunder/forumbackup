@@ -3,9 +3,7 @@
 
 import mechanize
 import cookielib
-import re
 import sys
-import getopt
 from config import *
 from globals import * 
 from BeautifulSoup import *
@@ -75,6 +73,7 @@ def getAdminTid(html):
         tid = tid[tid.rindex('=')+1:]
         _tid = tid
 
+    print _tid
     return _tid
 
 
@@ -115,7 +114,7 @@ def getMessagesInPage(html, idx, messages, page):
 
 
 # Get list of messages from a given section
-def getAllSectionMessages(browser, idx, url):
+def getMessagesInSection(browser, idx, url):
     # Compose and open section URL
     sectionResponse = browser.open('%(base)s/%(section)s' % \
                                    {'base': globals.URL,
@@ -143,7 +142,7 @@ def getAllSectionMessages(browser, idx, url):
     # Find the divs containing the messages
     for link in soup.findAll('a', attrs={'class':'topictitle',
                                          'href':re.compile(msghref)}):
-        messages.append((idx,link.text,link['href'],page))
+        messages.append((idx,link.text,link['href'],1))
 
     
     # Retrieve rest of messages from pages.
@@ -183,22 +182,24 @@ def backup(section):
     response = browser.open(globals.URL)
     html = response.read()
 
+    # Get administration TID (and assert value is valid!)
+    tid = getAdminTid(html)
+    print tid
+#    assert tid != ''
+
     # Get main sections from given html
     sections = getSections(html)
     
-    # Get administration TID (and assert value is valid!)
-    tid = getAdminTid(html)
-    assert tid != ''
-
     # Traverse the list of sections and retrieve the list of messages
     for idx, name, url in sections:
-        getMessages(browser, idx, url)
+        getMessagesInSection(browser, idx, url)
         
 
 
 if __name__ == '__main__':
 
     if len(sys.argv) < 2:
-        print 'Must give a section name from your credentials file'    
-        sys.exit(2)
-    backup(sys.argv[1])
+        section = 'clubsuperblackbird'
+    else:
+        section = sys.argv[1]
+    backup(section)
