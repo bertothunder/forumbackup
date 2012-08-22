@@ -16,6 +16,7 @@ def setupBrowser():
     browser_ = mechanize.Browser()
     browser_.set_handle_redirect(False)
     browser_.set_handle_robots(False)
+    browser_.set_debug_redirects(True)
 
     # Add necessary headers for User-agent
     browser_.addheaders = [('User-agent', globals.USERAGENT)]
@@ -87,7 +88,7 @@ def getSections(html, debug = False):
     sectionList = []
     for link in soup.findAll('a', attrs={'class':'forumtitle'}):
         sectionNum += 1
-        sectionList.append((sectionNum, link.text, link['href']))
+        sectionList.append((sectionNum, link.string, link['href']))
 
     if (debug):
         print "Número de secciones encontradas: ", sectionNum
@@ -110,15 +111,20 @@ def getMessagesInPage(html, idx, messages, page):
     # Find the divs containing the messages
     for link in soup.findAll('a', attrs={'class':'topictitle',
                                          'href':re.compile(msghref)}):
-        messages.append((idx,link.text,link['href'],page))
+        print "Añadiendo mensaje ",link.string, "con url", link['href']
+        messages.append((idx,link.string,link['href'],page))
 
 
 # Get list of messages from a given section
 def getMessagesInSection(browser, idx, url):
+    # Reset browser to clean it up
+    browser.set_handle_redirect(True)
+       
     # Compose and open section URL
-    sectionResponse = browser.open('%(base)s/%(section)s' % \
-                                   {'base': globals.URL,
-                                    'section': url})
+    sectionUrl = '%(base)s%(section)s' %  {'base': globals.URL, \
+                                            'section': url}
+    print sectionUrl
+    sectionResponse = browser.open(sectionUrl)
 
     # Setup some variables for later use
     messages = []
@@ -127,7 +133,7 @@ def getMessagesInSection(browser, idx, url):
     # Get section HTML
     html = sectionResponse.read()
 
-    # Begin parsing read HTML
+    # Be    gin parsing read HTML
     soup = BeautifulSoup(html)
 
     # Get number total of pages!
@@ -135,14 +141,18 @@ def getMessagesInSection(browser, idx, url):
     pages = soup.findAll('a', attrs={'href':re.compile(pageshref)})
 
     if len(pages):
-        totalpages = pages[-1].text # Last element of the list!
+        # Will use the previous to last element as last element will have no value (it's a "next" link)
+        totalpages = int(pages[len(pages)-2].string) # Last element of the list!
 
+    print "Página totales en la seccion: %(total)d" % {'total':totalpages}
+    
     # First of all, retrieve the messages from page 1
     msghref = '^/t\d+-\w+.*$'
     # Find the divs containing the messages
     for link in soup.findAll('a', attrs={'class':'topictitle',
                                          'href':re.compile(msghref)}):
-        messages.append((idx,link.text,link['href'],1))
+        print "Añadiendo mensaje ",link.string, "con url", link['href']
+        messages.append((idx,link.string,link['href'],1))
 
     
     # Retrieve rest of messages from pages.
@@ -154,7 +164,7 @@ def getMessagesInSection(browser, idx, url):
         rightUrl = url[pos:]
         # Begin in 2, we have parsed page # 1
         for page in range(2, totalpages):
-            pageUrl = '%(base)s/%(left)sp%(pagen)d%(right)s' % \
+            pageUrl = '%(base)s%(left)sp%(pagen)d%(right)s' % \
                       {'base':globals.URL,
                        'left':leftUrl,
                        'pagen':(page-1)*50,
@@ -189,9 +199,12 @@ def backup(section):
 
     # Get main sections from given html
     sections = getSections(html)
+    # sort sections
+    sections.sort
     
     # Traverse the list of sections and retrieve the list of messages
     for idx, name, url in sections:
+        print "Cargando mensajes de la sección ", name
         getMessagesInSection(browser, idx, url)
         
 
